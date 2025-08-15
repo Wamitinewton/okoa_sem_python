@@ -1,7 +1,3 @@
-"""
-Script to seed the database with sample data
-Run with: python scripts/seed_data.py
-"""
 import asyncio
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal

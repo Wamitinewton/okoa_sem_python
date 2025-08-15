@@ -1,7 +1,3 @@
-"""
-Script to create the initial database migration
-Run with: python scripts/create_initial_migration.py
-"""
 import subprocess
 import sys
 import os

@@ -1,7 +1,3 @@
-"""
-Script to run database migrations
-Run with: python scripts/run_migrations.py
-"""
 import subprocess
 import sys
 

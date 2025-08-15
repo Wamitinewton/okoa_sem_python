@@ -1,8 +1,3 @@
-# scripts/setup_database.py
-"""
-Complete database setup script
-Run with: python scripts/setup_database.py
-"""
 import subprocess
 import sys
 import os

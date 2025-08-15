@@ -1,4 +1,3 @@
-# app/services/auth_service.py
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
