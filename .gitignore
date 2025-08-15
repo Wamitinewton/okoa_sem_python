@@ -6,4 +6,3 @@ __pycache__/
 *.sqlite3
 app/core/config_test.py
 okoaenv/
-*__init__.py
