@@ -293,5 +293,3 @@ The application includes sample data for testing:
 Run `make seed` to populate your database with this sample data.
 
 ---
-
-**Happy Learning! 📚✨**
