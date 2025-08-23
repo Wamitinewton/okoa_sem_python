@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, List
 
@@ -12,12 +12,21 @@ class VideoBase(BaseModel):
     category: str = "general"
 
 class VideoCreate(VideoBase):
-    pass
+    user_id:str
 
-class VideoUpdate(BaseModel):
+
+
+class SaveVideo(VideoBase):
+    user_id : int
+
+class SavedVideoRequest(BaseModel):
+    user_id :int
+
+class VideoUpdate(SavedVideoRequest):
     category: Optional[str] = None
     watch_progress: Optional[float] = None
     total_watch_time: Optional[int] = None
+
 
 class SavedVideo(VideoBase):
     id: int
@@ -30,6 +39,15 @@ class SavedVideo(VideoBase):
     
     class Config:
         from_attributes = True
+
+
+class YouTubeSearchRequest(BaseModel):
+    user_id: int
+    q: str 
+    max_results: Optional[int] = None
+    page_token: Optional[str] = None
+    order: Optional[str] = None
+
 
 class YouTubeSearchResult(BaseModel):
     id: str

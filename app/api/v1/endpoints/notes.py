@@ -15,20 +15,20 @@ router = APIRouter()
 def create_note(
     note: NoteCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user)
 ):
     """Create a new study note"""
     # Verify that the video belongs to the user
     video = db.query(SavedVideo).filter(
         SavedVideo.id == note.video_id,
-        SavedVideo.user_id == current_user.id
+        SavedVideo.user_id == note.user_id
     ).first()
     
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
     
     db_note = StudyNote(
-        user_id=current_user.id,
+        user_id=note.user_id,
         video_id=note.video_id,
         content=note.content,
         timestamp=note.timestamp,
@@ -41,16 +41,17 @@ def create_note(
     db_note.tags = json.loads(db_note.tags)
     return db_note
 
-@router.get("/", response_model=List[StudyNoteSchema])
+@router.get("/{user_id}/", response_model=List[StudyNoteSchema])
 def get_notes(
+    user_id:int,
     video_id: Optional[int] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user)
 ):
     """Get user's study notes"""
-    query = db.query(StudyNote).filter(StudyNote.user_id == current_user.id)
+    query = db.query(StudyNote).filter(StudyNote.user_id == user_id)
     
     if video_id:
         query = query.filter(StudyNote.video_id == video_id)
@@ -60,16 +61,17 @@ def get_notes(
         note.tags = json.loads(note.tags) if note.tags else []
     return notes
 
-@router.get("/{note_id}", response_model=StudyNoteSchema)
+@router.get("/{note_id}/user/{user_id}", response_model=StudyNoteSchema)
 def get_note(
+    user_id:int,
     note_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user)
 ):
     """Get a specific note"""
     note = db.query(StudyNote).filter(
         StudyNote.id == note_id,
-        StudyNote.user_id == current_user.id
+        StudyNote.user_id == user_id
     ).first()
     
     if not note:
@@ -84,12 +86,12 @@ def update_note(
     note_id: int,
     note_update: NoteUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user)
 ):
     """Update a study note"""
     note = db.query(StudyNote).filter(
         StudyNote.id == note_id,
-        StudyNote.user_id == current_user.id
+        StudyNote.user_id == note_update.user_id
     ).first()
     
     if not note:
@@ -109,16 +111,17 @@ def update_note(
     note.tags = json.loads(note.tags)
     return note
 
-@router.delete("/{note_id}")
+@router.delete("/{note_id}/user/{user_id}")
 def delete_note(
+    user_id:int,
     note_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user)
 ):
     """Delete a study note"""
     note = db.query(StudyNote).filter(
         StudyNote.id == note_id,
-        StudyNote.user_id == current_user.id
+        StudyNote.user_id == user_id
     ).first()
     
     if not note:

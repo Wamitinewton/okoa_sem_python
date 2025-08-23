@@ -8,9 +8,10 @@ class PlaylistBase(BaseModel):
     description: Optional[str] = None
 
 class PlaylistCreate(PlaylistBase):
-    pass
+    user_id:int
 
 class PlaylistUpdate(BaseModel):
+    user_id:int
     name: Optional[str] = None
     description: Optional[str] = None
 
@@ -27,5 +28,6 @@ class PlaylistWithVideos(Playlist):
     videos: List[SavedVideo] = []
 
 class PlaylistVideoAdd(BaseModel):
+    user_id:int
     video_id: int
     order_index: Optional[int] = None

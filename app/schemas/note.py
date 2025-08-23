@@ -8,9 +8,11 @@ class NoteBase(BaseModel):
     tags: Optional[List[str]] = []
 
 class NoteCreate(NoteBase):
+    user_id:int
     video_id: int
 
 class NoteUpdate(BaseModel):
+    user_id :int
     content: Optional[str] = None
     timestamp: Optional[float] = None
     tags: Optional[List[str]] = None

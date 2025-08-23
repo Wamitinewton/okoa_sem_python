@@ -17,11 +17,11 @@ router = APIRouter()
 def create_playlist(
     playlist: PlaylistCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user)
 ):
     """Create a new playlist"""
     db_playlist = Playlist(
-        user_id=current_user.id,
+        user_id=playlist.user_id,
         name=playlist.name,
         description=playlist.description
     )
@@ -31,27 +31,29 @@ def create_playlist(
     db.refresh(db_playlist)
     return db_playlist
 
-@router.get("/", response_model=List[PlaylistSchema])
+@router.get("/user/{user_id}/", response_model=List[PlaylistSchema])
 def get_playlists(
+    user_id:int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user)
 ):
     """Get user's playlists"""
     playlists = db.query(Playlist).filter(
-        Playlist.user_id == current_user.id
+        Playlist.user_id == user_id
     ).all()
     return playlists
 
-@router.get("/{playlist_id}", response_model=PlaylistWithVideos)
+@router.get("/{playlist_id}/{user_id}/", response_model=PlaylistWithVideos)
 def get_playlist(
+    user_id:int,
     playlist_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user)
 ):
     """Get a specific playlist with videos"""
     playlist = db.query(Playlist).filter(
         Playlist.id == playlist_id,
-        Playlist.user_id == current_user.id
+        Playlist.user_id == user_id
     ).first()
     
     if not playlist:
@@ -64,12 +66,12 @@ def update_playlist(
     playlist_id: int,
     playlist_update: PlaylistUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user)
 ):
     """Update a playlist"""
     playlist = db.query(Playlist).filter(
         Playlist.id == playlist_id,
-        Playlist.user_id == current_user.id
+        Playlist.user_id == playlist_update.user_id
     ).first()
     
     if not playlist:
@@ -84,16 +86,17 @@ def update_playlist(
     db.refresh(playlist)
     return playlist
 
-@router.delete("/{playlist_id}")
+@router.delete("/{playlist_id}/user/{user_id}/")
 def delete_playlist(
+    user_id :int,
     playlist_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user)
 ):
     """Delete a playlist"""
     playlist = db.query(Playlist).filter(
         Playlist.id == playlist_id,
-        Playlist.user_id == current_user.id
+        Playlist.user_id == user_id
     ).first()
     
     if not playlist:
@@ -108,13 +111,13 @@ def add_video_to_playlist(
     playlist_id: int,
     video_data: PlaylistVideoAdd,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user)
 ):
     """Add a video to a playlist"""
     # Verify playlist ownership
     playlist = db.query(Playlist).filter(
         Playlist.id == playlist_id,
-        Playlist.user_id == current_user.id
+        Playlist.user_id == video_data.user_id
     ).first()
     
     if not playlist:
@@ -123,7 +126,7 @@ def add_video_to_playlist(
     # Verify video ownership
     video = db.query(SavedVideo).filter(
         SavedVideo.id == video_data.video_id,
-        SavedVideo.user_id == current_user.id
+        SavedVideo.user_id == video_data.user_id
     ).first()
     
     if not video:
@@ -138,18 +141,19 @@ def add_video_to_playlist(
     
     return {"message": "Video added to playlist successfully"}
 
-@router.delete("/{playlist_id}/videos/{video_id}")
+@router.delete("/{playlist_id}/videos/{video_id}/user/{user_id}/")
 def remove_video_from_playlist(
+    user_id:int,
     playlist_id: int,
     video_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    # current_user: User = Depends(get_current_user)
 ):
     """Remove a video from a playlist"""
     # Verify playlist ownership
     playlist = db.query(Playlist).filter(
         Playlist.id == playlist_id,
-        Playlist.user_id == current_user.id
+        Playlist.user_id == user_id
     ).first()
     
     if not playlist:
@@ -158,7 +162,7 @@ def remove_video_from_playlist(
     # Find and remove video from playlist
     video = db.query(SavedVideo).filter(
         SavedVideo.id == video_id,
-        SavedVideo.user_id == current_user.id
+        SavedVideo.user_id == user_id
     ).first()
     
     if not video or video not in playlist.videos:
