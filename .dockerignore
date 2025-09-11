@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.env.*
+.venv/
+venv/
+okoaenv/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Documentation
+*.md
+docs/
+
+# Development files
+scripts/
+tests/
+*.log
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Deployment
+deploy.sh
+setup-secrets.sh
+health-check.sh
+cloudbuild.yaml
+
+# Database
+*.sqlite3
+alembic/versions/*.py
+
+# Misc
+.DS_Store
+*.tar.gz
