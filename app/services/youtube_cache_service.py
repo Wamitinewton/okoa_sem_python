@@ -6,16 +6,24 @@ from app.schemas.video import YouTubeSearchResponse
 import redis.asyncio as redis  # use async client
 from datetime import timedelta
 
+# NEW: sentence transformers
+from sentence_transformers import SentenceTransformer, util
+import numpy as np
 
 class YouTubeCacheService:
     def __init__(self):
         self.redis_client = redis.from_url(
             settings.REDIS_URL,
-            decode_responses=True  # returns str instead of bytes
+            decode_responses=False  # embeddings will be binary
         )
         self.default_ttl = 3600  # 1 hour
         self.educational_ttl = 7200  # 2 hours
         self.prefix = "youtube_search"
+
+        # NEW: embedding model
+        self.model = SentenceTransformer("all-MiniLM-L6-v2")
+        self.vector_dim = 384  # embedding size for this model
+        self.similarity_threshold = 0.8  # adjust as needed
 
     def _generate_cache_key(
         self,
@@ -38,6 +46,45 @@ class YouTubeCacheService:
         cache_type = "edu" if is_educational else "search"
         return f"{self.prefix}:{cache_type}:{hash_key}"
 
+    async def _store_embedding(self, query: str, cache_key: str, ttl: int):
+        """Store query embedding for later similarity search"""
+        embedding = self.model.encode(query, normalize_embeddings=True).astype(np.float32).tobytes()
+        meta_key = f"{cache_key}:meta"
+        await self.redis_client.hset(meta_key, mapping={
+            "query": query.lower().strip(),
+            "embedding": embedding
+        })
+        await self.redis_client.expire(meta_key, ttl)
+
+    async def _find_similar_query(self, query: str) -> Optional[str]:
+        """Find similar cached query by comparing embeddings"""
+        # fetch all meta keys
+        meta_keys = await self.redis_client.keys(f"{self.prefix}:*:meta")
+        if not meta_keys:
+            return None
+
+        query_emb = self.model.encode(query, normalize_embeddings=True)
+
+        best_key = None
+        best_score = -1.0
+
+        for meta_key in meta_keys:
+            data = await self.redis_client.hgetall(meta_key)
+            if not data or b"embedding" not in data:
+                continue
+
+            emb_bytes = data[b"embedding"]
+            emb = np.frombuffer(emb_bytes, dtype=np.float32)
+
+            sim = util.cos_sim(query_emb, emb).item()
+            if sim > best_score:
+                best_score = sim
+                best_key = meta_key
+
+        if best_key and best_score >= self.similarity_threshold:
+            return best_key.decode().replace(":meta", "")
+        return None
+
     async def get_cached_search(
         self,
         query: str,
@@ -46,14 +93,23 @@ class YouTubeCacheService:
         order: str,
         is_educational: bool = False,
     ) -> Optional[YouTubeSearchResponse]:
-        """Get cached search results if available"""
+        """Get cached search results if available (with semantic similarity)"""
         try:
+            # exact match first
             cache_key = self._generate_cache_key(query, max_results, page_token, order, is_educational)
             cached_data = await self.redis_client.get(cache_key)
 
             if cached_data:
                 data = json.loads(cached_data)
                 return YouTubeSearchResponse(**data)
+
+            # try semantic similarity
+            similar_key = await self._find_similar_query(query)
+            if similar_key:
+                cached_data = await self.redis_client.get(similar_key)
+                if cached_data:
+                    data = json.loads(cached_data)
+                    return YouTubeSearchResponse(**data)
 
             return None
 
@@ -70,12 +126,14 @@ class YouTubeCacheService:
         results: YouTubeSearchResponse,
         is_educational: bool = False,
     ) -> None:
-        """Cache search results"""
+        """Cache search results (with embeddings)"""
         try:
             cache_key = self._generate_cache_key(query, max_results, page_token, order, is_educational)
             cache_data = results.model_dump_json()
             ttl = self.educational_ttl if is_educational else self.default_ttl
+
             await self.redis_client.setex(cache_key, ttl, cache_data)
+            await self._store_embedding(query, cache_key, ttl)
 
         except Exception as e:
             print(f"Cache storage error: {e}")
