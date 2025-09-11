@@ -6,7 +6,6 @@ from app.schemas.video import YouTubeSearchResponse
 import redis.asyncio as redis  # use async client
 from datetime import timedelta
 
-# NEW: sentence transformers
 from sentence_transformers import SentenceTransformer, util
 import numpy as np
 

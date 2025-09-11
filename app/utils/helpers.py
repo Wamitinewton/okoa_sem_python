@@ -1,6 +1,8 @@
 from typing import Dict, Any, List
 import json
 from datetime import datetime
+from fastapi import HTTPException, status
+from app.schemas.video import SaveVideo
 
 def serialize_tags(tags: List[str]) -> str:
     """Serialize tags list to JSON string"""
