@@ -3,7 +3,7 @@ import hashlib
 from typing import Optional, Dict, Any
 from app.core.config import settings
 from app.schemas.video import YouTubeSearchResponse
-import redis.asyncio as redis  # use async client
+import redis.asyncio as redis
 from datetime import timedelta
 
 from sentence_transformers import SentenceTransformer, util
@@ -13,16 +13,15 @@ class YouTubeCacheService:
     def __init__(self):
         self.redis_client = redis.from_url(
             settings.REDIS_URL,
-            decode_responses=False  # embeddings will be binary
+            decode_responses=False
         )
-        self.default_ttl = 3600  # 1 hour
-        self.educational_ttl = 7200  # 2 hours
+        self.default_ttl = 3600  
+        self.educational_ttl = 7200
         self.prefix = "youtube_search"
 
-        # NEW: embedding model
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
-        self.vector_dim = 384  # embedding size for this model
-        self.similarity_threshold = 0.8  # adjust as needed
+        self.vector_dim = 384
+        self.similarity_threshold = 0.8
 
     def _generate_cache_key(
         self,
@@ -30,7 +29,7 @@ class YouTubeCacheService:
         max_results: int,
         page_token: Optional[str],
         order: str,
-        is_educational: bool = True
+        is_educational: bool = False
     ) -> str:
         """Generate a consistent cache key for search parameters"""
         params = {
@@ -45,20 +44,26 @@ class YouTubeCacheService:
         cache_type = "edu" if is_educational else "search"
         return f"{self.prefix}:{cache_type}:{hash_key}"
 
-    async def _store_embedding(self, query: str, cache_key: str, ttl: int):
+    def _generate_base_query_key(self, query: str, is_educational: bool = False) -> str:
+        """Generate base query key for similarity matching (without pagination params)"""
+        cache_type = "edu" if is_educational else "search"
+        query_hash = hashlib.md5(query.lower().strip().encode()).hexdigest()
+        return f"{self.prefix}:{cache_type}:base:{query_hash}"
+
+    async def _store_embedding(self, query: str, base_key: str, ttl: int):
         """Store query embedding for later similarity search"""
         embedding = self.model.encode(query, normalize_embeddings=True).astype(np.float32).tobytes()
-        meta_key = f"{cache_key}:meta"
+        meta_key = f"{base_key}:meta"
         await self.redis_client.hset(meta_key, mapping={
             "query": query.lower().strip(),
             "embedding": embedding
         })
         await self.redis_client.expire(meta_key, ttl)
 
-    async def _find_similar_query(self, query: str) -> Optional[str]:
+    async def _find_similar_query(self, query: str, is_educational: bool = False) -> Optional[str]:
         """Find similar cached query by comparing embeddings"""
-        # fetch all meta keys
-        meta_keys = await self.redis_client.keys(f"{self.prefix}:*:meta")
+        cache_type = "edu" if is_educational else "search"
+        meta_keys = await self.redis_client.keys(f"{self.prefix}:{cache_type}:base:*:meta")
         if not meta_keys:
             return None
 
@@ -92,9 +97,8 @@ class YouTubeCacheService:
         order: str,
         is_educational: bool = False,
     ) -> Optional[YouTubeSearchResponse]:
-        """Get cached search results if available (with semantic similarity)"""
+        """Get cached search results if available"""
         try:
-            # exact match first
             cache_key = self._generate_cache_key(query, max_results, page_token, order, is_educational)
             cached_data = await self.redis_client.get(cache_key)
 
@@ -102,13 +106,16 @@ class YouTubeCacheService:
                 data = json.loads(cached_data)
                 return YouTubeSearchResponse(**data)
 
-            # try semantic similarity
-            similar_key = await self._find_similar_query(query)
-            if similar_key:
-                cached_data = await self.redis_client.get(similar_key)
-                if cached_data:
-                    data = json.loads(cached_data)
-                    return YouTubeSearchResponse(**data)
+            if not page_token:
+                similar_base_key = await self._find_similar_query(query, is_educational)
+                if similar_base_key:
+                    similar_cache_key = self._generate_cache_key(
+                        query, max_results, None, order, is_educational
+                    )
+                    cached_data = await self.redis_client.get(similar_cache_key)
+                    if cached_data:
+                        data = json.loads(cached_data)
+                        return YouTubeSearchResponse(**data)
 
             return None
 
@@ -125,14 +132,17 @@ class YouTubeCacheService:
         results: YouTubeSearchResponse,
         is_educational: bool = False,
     ) -> None:
-        """Cache search results (with embeddings)"""
+        """Cache search results with proper pagination support"""
         try:
             cache_key = self._generate_cache_key(query, max_results, page_token, order, is_educational)
             cache_data = results.model_dump_json()
             ttl = self.educational_ttl if is_educational else self.default_ttl
 
             await self.redis_client.setex(cache_key, ttl, cache_data)
-            await self._store_embedding(query, cache_key, ttl)
+
+            if not page_token:
+                base_key = self._generate_base_query_key(query, is_educational)
+                await self._store_embedding(query, base_key, ttl)
 
         except Exception as e:
             print(f"Cache storage error: {e}")
@@ -159,11 +169,14 @@ class YouTubeCacheService:
         try:
             search_keys = await self.redis_client.keys(f"{self.prefix}:search:*")
             edu_keys = await self.redis_client.keys(f"{self.prefix}:edu:*")
+            
+            search_data_keys = [k for k in search_keys if not k.decode().endswith(':meta')]
+            edu_data_keys = [k for k in edu_keys if not k.decode().endswith(':meta')]
 
             return {
-                "total_cached_searches": len(search_keys) + len(edu_keys),
-                "regular_searches": len(search_keys),
-                "educational_searches": len(edu_keys),
+                "total_cached_searches": len(search_data_keys) + len(edu_data_keys),
+                "regular_searches": len(search_data_keys),
+                "educational_searches": len(edu_data_keys),
                 "cache_prefix": self.prefix,
             }
 
@@ -172,5 +185,4 @@ class YouTubeCacheService:
             return {"error": str(e)}
 
 
-# Create service instance
 youtube_cache_service = YouTubeCacheService()

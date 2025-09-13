@@ -5,4 +5,4 @@ __pycache__/
 .env.*
 *.sqlite3
 app/core/config_test.py
-okoaenv/
+okoaenv/setup-secrets.sh
