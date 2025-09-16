@@ -50,8 +50,10 @@ gcloud run deploy "$SERVICE_NAME" \
     --cpu=2 \
     --concurrency=100 \
     --max-instances=10 \
-    --min-instances=0 \
+    --min-instances=1 \
     --timeout=300 \
+    --cpu-boost \
+    --execution-environment=gen2 \
     --set-env-vars="ALGORITHM=HS256" \
     --set-secrets="POSTGRES_SERVER=postgres-server:latest,POSTGRES_USER=postgres-user:latest,POSTGRES_PASSWORD=postgres-password:latest,POSTGRES_DB=postgres-db:latest,REDIS_URL=redis-url:latest,SECRET_KEY=secret-key:latest,YOUTUBE_API_KEY=youtube-api-key:latest,OPENAI_API_KEY=openai-api-key:latest,BACKEND_CORS_ORIGINS=backend-cors-origins:latest"
 

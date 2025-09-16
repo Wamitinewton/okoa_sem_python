@@ -2,11 +2,9 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'gcr.io/$PROJECT_ID/okoa-sem-backend:$SHORT_SHA', '.']
   
-  # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/okoa-sem-backend:$SHORT_SHA']
   
-  # Deploy to Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - 'run'
@@ -27,6 +25,11 @@ steps:
       - '2'
       - '--max-instances'
       - '10'
+      - '--min-instances'
+      - '1'
+      - '--cpu-boost'
+      - '--execution-environment'
+      - 'gen2'
       - '--set-env-vars'
       - 'PROJECT_ID=$PROJECT_ID'
 
